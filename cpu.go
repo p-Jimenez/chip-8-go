@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -84,7 +83,6 @@ func fetch(cpu *CPU) uint16 {
 }
 
 func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
-	fmt.Printf("opcode: %x\n", opcode)
 	switch opcode & 0xF000 {
 	case 0x00E0:
 		clearDisplay(cpu, window)
@@ -204,9 +202,7 @@ func drawSprite(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 }
 
 func jumpToAddress(cpu *CPU, address uint16) {
-	fmt.Printf("jumping to address: %x\n from pc: %x\n", address, cpu.pc)
 	cpu.pc = address
-
 }
 
 func runWindow() {
