@@ -101,7 +101,7 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 	case 0x6000:
 		setRegister(cpu, opcode)
 	case 0x7000:
-		// TODO: addToRegister(cpu, opcode)
+		addToRegister(cpu, opcode)
 	case 0x8000:
 		// TODO: setRegisterToRegister(cpu, opcode)
 	case 0x8001:
@@ -166,6 +166,10 @@ func clearDisplay(cpu *CPU, window *pixelgl.Window) {
 
 func setRegister(cpu *CPU, opcode uint16) {
 	cpu.v[(opcode&0x0F00)>>8] = uint8(opcode & 0x00FF)
+}
+
+func addToRegister(cpu *CPU, opcode uint16) {
+	cpu.v[(opcode&0x0F00)>>8] += uint8(opcode & 0x00FF)
 }
 
 func setIndexRegister(cpu *CPU, opcode uint16) {

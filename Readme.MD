@@ -14,6 +14,8 @@ go run . <path to rom>
 
 - [Chip-8 Instruction Set](http://johnearnest.github.io/Octo/docs/chip8ref.pdf)
 
+- [Chip-8 Test ROMs](https://github.com/Timendus/chip8-test-suite)
+
 ## Test ROMs Passed
 
 - [x] 1-chip8-logo.ch8
