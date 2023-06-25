@@ -11,15 +11,16 @@ import (
 )
 
 type CPU struct {
-	memory   [4096]uint8
-	pc       uint16
-	v        [16]uint8
-	i        uint16
-	sp       uint8
-	dt       uint8
-	st       uint8
-	stack    [16]uint16
-	keyboard Keyboard
+	memory    [4096]uint8
+	pc        uint16
+	v         [16]uint8
+	i         uint16
+	sp        uint8
+	dt        uint8
+	st        uint8
+	stack     [16]uint16
+	keyboard  Keyboard
+	superchip bool
 }
 
 type Sprite struct {
@@ -48,7 +49,6 @@ func cpuLoop(cpu *CPU, window *pixelgl.Window) {
 
 	// 1. Fetch
 	opcode := fetch(cpu)
-	cpu.pc += 2
 
 	// 2. Decode and execute
 	decode(cpu, opcode, window)
@@ -85,7 +85,9 @@ func initCpu() {
 }
 
 func fetch(cpu *CPU) uint16 {
-	return uint16(cpu.memory[cpu.pc])<<8 | uint16(cpu.memory[cpu.pc+1])
+	opcode := uint16(cpu.memory[cpu.pc])<<8 | uint16(cpu.memory[cpu.pc+1])
+	cpu.pc += 2
+	return opcode
 }
 
 func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
@@ -121,11 +123,12 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 		case 0x0004:
 			addRegisterToRegister(cpu, opcode)
 		case 0x0005:
-			subtractRegisterFromRegister(cpu, opcode)
+			subtractRegisterFromRegister(cpu, opcode, false)
 		case 0x0006:
 			shiftRegisterRight(cpu, opcode)
 		case 0x0007:
-			subtractRegisterFromRegister(cpu, opcode)
+			// swap registers
+			subtractRegisterFromRegister(cpu, opcode, true)
 		case 0x000E:
 			shiftRegisterLeft(cpu, opcode)
 		}
@@ -214,13 +217,35 @@ func setRegisterToRegisterXor(cpu *CPU, opcode uint16) {
 }
 
 func addRegisterToRegister(cpu *CPU, opcode uint16) {
-	value := cpu.v[(opcode&0x0F00)>>8] + cpu.v[(opcode&0x00F0)>>4]
-	cpu.v[(opcode&0x0F00)>>8] = value
+	vx := cpu.v[(opcode&0x0F00)>>8]
+	vy := cpu.v[(opcode&0x00F0)>>4]
+	vf := uint16(vx) + uint16(vy)
+
+	if vf > 255 {
+		cpu.v[15] = 1
+	} else {
+		cpu.v[15] = 0
+	}
+
+	cpu.v[(opcode&0x0F00)>>8] = vx + vy
 }
 
-func subtractRegisterFromRegister(cpu *CPU, opcode uint16) {
-	value := cpu.v[(opcode&0x0F00)>>8] - cpu.v[(opcode&0x00F0)>>4]
-	cpu.v[(opcode&0x0F00)>>8] = value
+func subtractRegisterFromRegister(cpu *CPU, opcode uint16, swap bool) {
+
+	vx := cpu.v[(opcode&0x0F00)>>8]
+	vy := cpu.v[(opcode&0x00F0)>>4]
+
+	if swap {
+		vx, vy = vy, vx
+	}
+
+	if vx > vy {
+		cpu.v[15] = 1
+	} else {
+		cpu.v[15] = 0
+	}
+
+	cpu.v[(opcode&0x0F00)>>8] = vx - vy
 }
 
 func shiftRegisterRight(cpu *CPU, opcode uint16) {
