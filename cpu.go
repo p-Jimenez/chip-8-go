@@ -221,13 +221,13 @@ func addRegisterToRegister(cpu *CPU, opcode uint16) {
 	vy := cpu.v[(opcode&0x00F0)>>4]
 	vf := uint16(vx) + uint16(vy)
 
+	cpu.v[(opcode&0x0F00)>>8] = vx + vy
+
 	if vf > 255 {
 		cpu.v[15] = 1
 	} else {
 		cpu.v[15] = 0
 	}
-
-	cpu.v[(opcode&0x0F00)>>8] = vx + vy
 }
 
 func subtractRegisterFromRegister(cpu *CPU, opcode uint16, swap bool) {
@@ -239,21 +239,25 @@ func subtractRegisterFromRegister(cpu *CPU, opcode uint16, swap bool) {
 		vx, vy = vy, vx
 	}
 
-	if vx > vy {
-		cpu.v[15] = 1
-	} else {
-		cpu.v[15] = 0
-	}
-
 	cpu.v[(opcode&0x0F00)>>8] = vx - vy
+
+	if vx > vy {
+		cpu.v[15] = 0
+	} else {
+		cpu.v[15] = 1
+	}
 }
 
 func shiftRegisterRight(cpu *CPU, opcode uint16) {
+	leastSignificantBit := cpu.v[(opcode&0x0F00)>>8] & 0x1
 	cpu.v[(opcode&0x0F00)>>8] = cpu.v[(opcode&0x0F00)>>8] >> 1
+	cpu.v[15] = leastSignificantBit
 }
 
 func shiftRegisterLeft(cpu *CPU, opcode uint16) {
+	mostSignificantBit := cpu.v[(opcode&0x0F00)>>8] & 0x80
 	cpu.v[(opcode&0x0F00)>>8] = cpu.v[(opcode&0x0F00)>>8] << 1
+	cpu.v[15] = mostSignificantBit
 }
 
 func addToIndexRegister(cpu *CPU, opcode uint16) {
