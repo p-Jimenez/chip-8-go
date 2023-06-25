@@ -41,6 +41,7 @@ const PIXEL_SIZE = 20.0
 
 func cpuLoop(cpu *CPU, window *pixelgl.Window) {
 
+	// Fallback to prevent index out of bounds
 	if (cpu.pc + 1) >= 4096 {
 		return
 	}
@@ -53,8 +54,13 @@ func cpuLoop(cpu *CPU, window *pixelgl.Window) {
 	decode(cpu, opcode, window)
 
 	// 3. Update timers
-	cpu.dt--
-	cpu.st--
+	if cpu.dt > 0 {
+		cpu.dt--
+	}
+
+	if cpu.st > 0 {
+		cpu.st--
+	}
 }
 
 func getProgram() []uint8 {
@@ -84,16 +90,16 @@ func fetch(cpu *CPU) uint16 {
 
 func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 	switch opcode & 0xF000 {
-	case 0x00E0:
-		clearDisplay(cpu, window)
-	case 0x00EE:
-		// TODO: returnFromSubroutine()
+	case 0x0000:
+		if opcode == 0x00EE {
+			returnFromSubroutine(cpu)
+		}
 	case 0x1000:
 		jumpToAddress(cpu, opcode&0x0FFF)
 	case 0x2000:
-		// TODO: callSubroutine(opcode & 0x0FFF)
+		callSubroutine(cpu, opcode&0x0FFF)
 	case 0x3000:
-		// TODO: skipIfEqual(cpu, opcode)
+		skipIfEqual(cpu, opcode)
 	case 0x4000:
 		// TODO: skipIfNotEqual(cpu, opcode)
 	case 0x5000:
@@ -103,23 +109,26 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 	case 0x7000:
 		addToRegister(cpu, opcode)
 	case 0x8000:
-		// TODO: setRegisterToRegister(cpu, opcode)
-	case 0x8001:
-		// TODO: setRegisterToRegisterOr(cpu, opcode)
-	case 0x8002:
-		// TODO: setRegisterToRegisterAnd(cpu, opcode)
-	case 0x8003:
-		// TODO: setRegisterToRegisterXor(cpu, opcode)
-	case 0x8004:
-		// TODO: addRegisterToRegister(cpu, opcode)
-	case 0x8005:
-		// TODO: subtractRegisterFromRegister(cpu, opcode)
-	case 0x8006:
-		// TODO: shiftRegisterRight(cpu, opcode)
-	case 0x8007:
-		// TODO: subtractRegisterFromRegister(cpu, opcode)
-	case 0x800E:
-		// TODO: shiftRegisterLeft(cpu, opcode)
+		switch opcode & 0x000F {
+		case 0x0000:
+			setRegisterToRegister(cpu, opcode)
+		case 0x0001:
+			setRegisterToRegisterOr(cpu, opcode)
+		case 0x0002:
+			setRegisterToRegisterAnd(cpu, opcode)
+		case 0x0003:
+			setRegisterToRegisterXor(cpu, opcode)
+		case 0x0004:
+			addRegisterToRegister(cpu, opcode)
+		case 0x0005:
+			subtractRegisterFromRegister(cpu, opcode)
+		case 0x0006:
+			shiftRegisterRight(cpu, opcode)
+		case 0x0007:
+			subtractRegisterFromRegister(cpu, opcode)
+		case 0x000E:
+			shiftRegisterLeft(cpu, opcode)
+		}
 	case 0x9000:
 		// TODO: skipIfNotEqualRegisters(cpu, opcode)
 	case 0xA000:
@@ -130,28 +139,34 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 		// TODO: setRegisterToRandom(cpu, opcode)
 	case 0xD000:
 		drawSprite(cpu, opcode, window)
-	case 0xE09E:
-		// TODO: skipIfKeyPressed(cpu, opcode)
-	case 0xE0A1:
-		// TODO: skipIfKeyNotPressed(cpu, opcode)
-	case 0xF007:
-		// TODO: setRegisterToDelayTimer(cpu, opcode)
-	case 0xF00A:
-		// TODO: waitForKeyPress(cpu, opcode)
-	case 0xF015:
-		// TODO: setDelayTimer(cpu, opcode)
-	case 0xF018:
-		// TODO: setSoundTimer(cpu, opcode)
-	case 0xF01E:
-		// TODO: addToIndexRegister(cpu, opcode)
-	case 0xF029:
-		// TODO: setIndexRegisterToSprite(cpu, opcode)
-	case 0xF033:
-		// TODO: storeBinaryCodedDecimal(cpu, opcode)
-	case 0xF055:
-		// TODO: storeRegisters(cpu, opcode)
-	case 0xF065:
-		// TODO: loadRegisters(cpu, opcode)
+	case 0xE000:
+		switch opcode & 0x00FF {
+		case 0x009E:
+			// TODO: skipIfKeyPressed(cpu, opcode)
+		case 0x00A1:
+			// TODO: skipIfKeyNotPressed(cpu, opcode)
+		}
+	case 0xF000:
+		switch opcode & 0x00FF {
+		case 0x0007:
+			// TODO: setRegisterToDelayTimer(cpu, opcode)
+		case 0x000A:
+			// TODO: waitForKeyPress(cpu, opcode)
+		case 0x0015:
+			// TODO: setDelayTimer(cpu, opcode)
+		case 0x0018:
+			// TODO: setSoundTimer(cpu, opcode)
+		case 0x001E:
+			addToIndexRegister(cpu, opcode)
+		case 0x0029:
+			// TODO: setIndexRegisterToSprite(cpu, opcode)
+		case 0x0033:
+			storeBinaryCodedDecimal(cpu, opcode)
+		case 0x0055:
+			storeRegisters(cpu, opcode)
+		case 0x0065:
+			loadRegisters(cpu, opcode)
+		}
 	}
 }
 
@@ -170,6 +185,73 @@ func setRegister(cpu *CPU, opcode uint16) {
 
 func addToRegister(cpu *CPU, opcode uint16) {
 	cpu.v[(opcode&0x0F00)>>8] += uint8(opcode & 0x00FF)
+}
+
+func skipIfEqual(cpu *CPU, opcode uint16) {
+	if cpu.v[(opcode&0x0F00)>>8] == uint8(opcode&0x00FF) {
+		cpu.pc += 2
+	}
+}
+
+func setRegisterToRegister(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func setRegisterToRegisterOr(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8] | cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func setRegisterToRegisterAnd(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8] & cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func setRegisterToRegisterXor(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8] ^ cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func addRegisterToRegister(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8] + cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func subtractRegisterFromRegister(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8] - cpu.v[(opcode&0x00F0)>>4]
+	cpu.v[(opcode&0x0F00)>>8] = value
+}
+
+func shiftRegisterRight(cpu *CPU, opcode uint16) {
+	cpu.v[(opcode&0x0F00)>>8] = cpu.v[(opcode&0x0F00)>>8] >> 1
+}
+
+func shiftRegisterLeft(cpu *CPU, opcode uint16) {
+	cpu.v[(opcode&0x0F00)>>8] = cpu.v[(opcode&0x0F00)>>8] << 1
+}
+
+func addToIndexRegister(cpu *CPU, opcode uint16) {
+	cpu.i += uint16(cpu.v[(opcode&0x0F00)>>8])
+}
+
+func storeBinaryCodedDecimal(cpu *CPU, opcode uint16) {
+	value := cpu.v[(opcode&0x0F00)>>8]
+	cpu.memory[cpu.i] = value / 100
+	cpu.memory[cpu.i+1] = (value / 10) % 10
+	cpu.memory[cpu.i+2] = (value % 100) % 10
+}
+
+func storeRegisters(cpu *CPU, opcode uint16) {
+	for i := uint16(0); i <= ((opcode & 0x0F00) >> 8); i++ {
+		cpu.memory[cpu.i+i] = cpu.v[i]
+	}
+}
+
+func loadRegisters(cpu *CPU, opcode uint16) {
+	for i := uint16(0); i <= ((opcode & 0x0F00) >> 8); i++ {
+		cpu.v[i] = cpu.memory[cpu.i+i]
+	}
 }
 
 func setIndexRegister(cpu *CPU, opcode uint16) {
@@ -207,6 +289,17 @@ func drawSprite(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 
 func jumpToAddress(cpu *CPU, address uint16) {
 	cpu.pc = address
+}
+
+func callSubroutine(cpu *CPU, address uint16) {
+	cpu.stack[cpu.sp] = cpu.pc
+	cpu.sp++
+	cpu.pc = address
+}
+
+func returnFromSubroutine(cpu *CPU) {
+	cpu.sp--
+	cpu.pc = cpu.stack[cpu.sp]
 }
 
 func runWindow() {
