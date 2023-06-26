@@ -103,7 +103,7 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 	case 0x3000:
 		skipIfEqual(cpu, opcode)
 	case 0x4000:
-		// TODO: skipIfNotEqual(cpu, opcode)
+		skipIfNotEqual(cpu, opcode)
 	case 0x5000:
 		// TODO: skipIfEqualRegisters(cpu, opcode)
 	case 0x6000:
@@ -127,13 +127,12 @@ func decode(cpu *CPU, opcode uint16, window *pixelgl.Window) {
 		case 0x0006:
 			shiftRegisterRight(cpu, opcode)
 		case 0x0007:
-			// swap registers
 			subtractRegisterFromRegister(cpu, opcode, true)
 		case 0x000E:
 			shiftRegisterLeft(cpu, opcode)
 		}
 	case 0x9000:
-		// TODO: skipIfNotEqualRegisters(cpu, opcode)
+		skipIfNotEqualRegisters(cpu, opcode)
 	case 0xA000:
 		setIndexRegister(cpu, opcode)
 	case 0xB000:
@@ -234,18 +233,20 @@ func subtractRegisterFromRegister(cpu *CPU, opcode uint16, swap bool) {
 
 	vx := cpu.v[(opcode&0x0F00)>>8]
 	vy := cpu.v[(opcode&0x00F0)>>4]
+	var vf uint8
 
 	if swap {
 		vx, vy = vy, vx
 	}
 
-	cpu.v[(opcode&0x0F00)>>8] = vx - vy
-
 	if vx > vy {
-		cpu.v[15] = 0
+		vf = 1
 	} else {
-		cpu.v[15] = 1
+		vf = 0
 	}
+
+	cpu.v[(opcode&0x0F00)>>8] = vx - vy
+	cpu.v[15] = vf
 }
 
 func shiftRegisterRight(cpu *CPU, opcode uint16) {
@@ -255,7 +256,7 @@ func shiftRegisterRight(cpu *CPU, opcode uint16) {
 }
 
 func shiftRegisterLeft(cpu *CPU, opcode uint16) {
-	mostSignificantBit := cpu.v[(opcode&0x0F00)>>8] & 0x80
+	mostSignificantBit := cpu.v[(opcode&0x0F00)>>8] >> 7
 	cpu.v[(opcode&0x0F00)>>8] = cpu.v[(opcode&0x0F00)>>8] << 1
 	cpu.v[15] = mostSignificantBit
 }
@@ -329,6 +330,18 @@ func callSubroutine(cpu *CPU, address uint16) {
 func returnFromSubroutine(cpu *CPU) {
 	cpu.sp--
 	cpu.pc = cpu.stack[cpu.sp]
+}
+
+func skipIfNotEqual(cpu *CPU, opcode uint16) {
+	if cpu.v[(opcode&0x0F00)>>8] != uint8(opcode&0x00FF) {
+		cpu.pc += 2
+	}
+}
+
+func skipIfNotEqualRegisters(cpu *CPU, opcode uint16) {
+	if cpu.v[(opcode&0x0F00)>>8] != cpu.v[(opcode&0x00F0)>>4] {
+		cpu.pc += 2
+	}
 }
 
 func runWindow() {
